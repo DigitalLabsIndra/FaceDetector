@@ -1,0 +1,101 @@
+<?xml version="1.0"?>
+<ruleset name="CYSA Checks" xmlns="http://pmd.sourceforge.net/ruleset/2.0.0"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://pmd.sourceforge.net/ruleset/2.0.0 https://pmd.sourceforge.io/ruleset_2_0_0.xsd">
+
+    <description>
+        CYSA custom rules
+    </description>
+
+    <rule ref="category/java/bestpractices.xml">
+        <!-- Da muchos falsos positivos -->
+        <exclude name="UseVarargs" />
+        <exclude name="UnusedPrivateMethod" />
+        <exclude name="AbstractClassWithoutAbstractMethod" />
+    </rule>
+    <rule ref="category/java/bestpractices.xml/UnusedPrivateMethod">
+        <properties>
+            <property name="ignoredAnnotations" value="javax.annotation.*|javax.inject.*" />
+        </properties>
+    </rule>
+    <rule ref="category/java/codestyle.xml">
+        <exclude name="ShortVariable" />
+        <exclude name="LongVariable" />
+        <exclude name="ClassNamingConventions" />
+        <exclude name="ShortClassName" />
+        <exclude name="CommentDefaultAccessModifier" />
+        <exclude name="FormalParameterNamingConventions" />
+        <exclude name="UnnecessaryConstructor" />
+        <exclude name="UselessParentheses" />
+        <exclude name="OnlyOneReturn" />
+        <exclude name="LinguisticNaming" />
+        <exclude name="IdenticalCatchBranches" />
+        <exclude name="LocalVariableCouldBeFinal" />
+        <exclude name="DefaultPackage" />
+        <exclude name="AtLeastOneConstructor" />
+        <exclude name="CallSuperInConstructor" />
+        <exclude name="ConfusingTernary" />
+        <exclude name="FieldDeclarationsShouldBeAtStartOfClass" />
+    </rule>
+    <rule ref="category/java/codestyle.xml/LocalVariableCouldBeFinal">
+        <properties>
+            <property name="ignoreForEachDecl" value="true" />
+        </properties>
+    </rule>
+    <rule ref="category/java/codestyle.xml/FormalParameterNamingConventions">
+        <properties>
+            <property name="methodParameterPattern" value="[a-z][a-zA-Z0-9]*" />
+            <property name="finalMethodParameterPattern" value="[a-z][a-zA-Z0-9]*" />
+            <property name="lambdaParameterPattern" value="[a-zA-Z][a-zA-Z0-9]*" />
+            <property name="explicitLambdaParameterPattern" value="[a-z][a-zA-Z0-9]*" />
+        </properties>
+    </rule>
+    <rule ref="category/java/design.xml">
+        <exclude name="LoosePackageCoupling" />
+        <exclude name="DataClass" />
+        <exclude name="LawOfDemeter" />
+        <exclude name="TooManyFields" />
+        <exclude name="TooManyMethods" />
+        <exclude name="ExcessiveImports" />
+        <exclude name="CyclomaticComplexity" />
+        <exclude name="NPathComplexity" />
+        <exclude name="ExcessiveParameterList" />
+        <exclude name="SwitchDensity" />
+        <exclude name="AvoidDeeplyNestedIfStmts" />
+        <exclude name="CollapsibleIfStatements" />
+    </rule>
+    <rule ref="category/java/design.xml/AvoidDeeplyNestedIfStmts">
+        <properties>
+            <property name="problemDepth" value="5" />
+        </properties>
+    </rule>
+    <rule ref="category/java/errorprone.xml">
+        <exclude name="DataflowAnomalyAnalysis" />
+        <exclude name="AssignmentInOperand" />
+        <exclude name="AvoidDuplicateLiterals" />
+        <exclude name="BeanMembersShouldSerialize" />
+        <exclude name="AvoidLiteralsInIfCondition" />
+        <exclude name="NullAssignment" />
+    </rule>
+    <rule ref="category/java/errorprone.xml/AssignmentInOperand">
+        <properties>
+            <property name="allowIf" value="false" />
+            <property name="allowFor" value="true" />
+            <property name="allowWhile" value="true" />
+            <property name="allowIncrementDecrement" value="true" />
+        </properties>
+    </rule>
+    <rule ref="category/java/multithreading.xml">
+        <exclude name="UseConcurrentHashMap" />
+    </rule>
+    <rule ref="category/java/performance.xml">
+        <!-- Da muchos falsos positivos. Se espera del desarrollador el reuso de objetos. -->
+        <exclude name="AvoidInstantiatingObjectsInLoops" />
+        <!-- Se prefiere pérdida de rendimiento a cambio de legibilidad en cada bloque de append -->
+        <exclude name="ConsecutiveLiteralAppends" />
+        <!-- Se permite pocas opciones en un switch para acomodar enumerados de una manera más legible -->
+        <exclude name="TooFewBranchesForASwitchStatement" />
+        <exclude name="ConsecutiveAppendsShouldReuse" />
+    </rule>
+    <rule ref="category/java/security.xml" />
+</ruleset>
