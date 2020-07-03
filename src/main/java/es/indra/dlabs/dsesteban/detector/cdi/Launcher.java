@@ -9,7 +9,6 @@ import javax.enterprise.inject.se.SeContainerInitializer;
 import javax.enterprise.util.AnnotationLiteral;
 
 import org.jboss.weld.environment.se.Weld;
-import org.opencv.core.Core;
 
 import javafx.application.Application;
 import javafx.stage.Stage;
@@ -37,9 +36,7 @@ public class Launcher extends Application {
      * @param args
      *        TODO: document
      */
-    @SuppressWarnings("PMD.AvoidUsingNativeCode")
     public static void main(final String[] args) {
-        System.loadLibrary(Core.NATIVE_LIBRARY_NAME);
         launch(args);
     }
 

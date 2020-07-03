@@ -4,6 +4,7 @@
  **/
 package es.indra.dlabs.dsesteban.detector.opencv;
 
+import java.awt.image.BufferedImage;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.locks.ReadWriteLock;
@@ -22,7 +23,6 @@ import org.slf4j.LoggerFactory;
 
 import es.indra.dlabs.dsesteban.detector.VideoGrabber;
 import es.indra.dlabs.dsesteban.detector.cdi.GrabberEvent;
-import javafx.scene.image.Image;
 
 /**
  * TODO: document.
@@ -41,7 +41,10 @@ public class OpenCVCameraGrabber implements VideoGrabber {
     private ExecutorService captureExec;
     @Inject
     @GrabberEvent
-    Event<Image> frmBroadcaster;
+    Event<BufferedImage> eventPlayers;
+    @Inject
+    @GrabberEvent
+    Event<Mat> eventProcessors;
     @Inject
     @GrabberEvent
     Event<GrabberStatus> statusNotifier;
@@ -82,9 +85,9 @@ public class OpenCVCameraGrabber implements VideoGrabber {
                 while (!isCanceled() && capture.isOpened()) {
                     final Mat frame = new Mat();
                     if (!isCanceled() && capture.read(frame)) {
-                        LOG.trace("Image readed");
                         if (!isCanceled()) {
-                            notifyPlayers(OpenCVUtils.mat2Image(frame));
+                            notifyPlayers(OpenCVUtils.matToBufferedImage(frame));
+                            notifyProcessors(frame);
                         }
                     } else {
                         LOG.trace("Grabber cancelado o no puede hacer read");
@@ -153,9 +156,15 @@ public class OpenCVCameraGrabber implements VideoGrabber {
         enableCapturing();
     }
 
-    private void notifyPlayers(final Image image) {
+    private void notifyPlayers(final BufferedImage image) {
         if (image != null) {
-            frmBroadcaster.fireAsync(image);
+            eventPlayers.fireAsync(image);
+        }
+    }
+
+    private void notifyProcessors(final Mat image) {
+        if (image != null) {
+            eventProcessors.fireAsync(image);
         }
     }
 

@@ -8,11 +8,6 @@ import java.awt.image.BufferedImage;
 import java.awt.image.DataBufferByte;
 
 import org.opencv.core.Mat;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import javafx.embed.swing.SwingFXUtils;
-import javafx.scene.image.Image;
 
 /**
  * TODO: document.
@@ -21,28 +16,16 @@ import javafx.scene.image.Image;
  */
 public final class OpenCVUtils {
 
-    /** Logger. */
-    private static final Logger LOG = LoggerFactory.getLogger(OpenCVUtils.class);
-
     private OpenCVUtils() {
     }
 
     /**
      * TODO: document.
-     * @param frame
+     * @param original
      *        TODO: document
      * @return TODO: document
      */
-    public static Image mat2Image(final Mat frame) {
-        try {
-            return SwingFXUtils.toFXImage(matToBufferedImage(frame), null);
-        } catch (IllegalArgumentException ex) {
-            LOG.error("Cannot convert the Mat object: {}", ex.getMessage());
-            return null;
-        }
-    }
-
-    private static BufferedImage matToBufferedImage(final Mat original) {
+    public static BufferedImage matToBufferedImage(final Mat original) {
         final BufferedImage image;
         final int width = original.width();
         final int height = original.height();

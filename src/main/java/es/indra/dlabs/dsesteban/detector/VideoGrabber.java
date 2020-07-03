@@ -10,7 +10,7 @@ package es.indra.dlabs.dsesteban.detector;
  * @since 0.1
  */
 public interface VideoGrabber extends AutoCloseable {
-    
+
     /**
      * TODO: document.
      * @version 0.1
@@ -29,15 +29,11 @@ public interface VideoGrabber extends AutoCloseable {
 
     /**
      * TODO: document.
-     * @param player
-     *        TODO: document
      */
     void startCapturing();
 
     /**
      * TODO: document.
-     * @param player
-     *        TODO: document
      */
     void stopCapturing();
 

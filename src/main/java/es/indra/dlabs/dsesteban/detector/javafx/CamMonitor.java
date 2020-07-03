@@ -2,7 +2,7 @@
  * Copyright (C) 2020 INDRA FACTORÍA TECNOLÓGICA S.L.U.
  * All rights reserved
  **/
-package es.indra.dlabs.dsesteban.detector;
+package es.indra.dlabs.dsesteban.detector.javafx;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -14,6 +14,7 @@ import javax.inject.Singleton;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import es.indra.dlabs.dsesteban.detector.VideoGrabber;
 import es.indra.dlabs.dsesteban.detector.cdi.StartupScene;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Scene;
