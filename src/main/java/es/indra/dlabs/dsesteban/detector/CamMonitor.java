@@ -7,11 +7,14 @@ package es.indra.dlabs.dsesteban.detector;
 import java.io.IOException;
 import java.io.InputStream;
 
+import javax.enterprise.event.Observes;
 import javax.inject.Inject;
+import javax.inject.Singleton;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import es.indra.dlabs.dsesteban.detector.cdi.StartupScene;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Scene;
 import javafx.scene.layout.BorderPane;
@@ -23,6 +26,7 @@ import javafx.stage.WindowEvent;
  * @version 0.1
  * @since 0.1
  */
+@Singleton
 public class CamMonitor {
 
     /** Logger. */
@@ -42,7 +46,7 @@ public class CamMonitor {
      *        TODO: document
      */
     @SuppressWarnings("PMD.AvoidCatchingGenericException")
-    public void start(final Stage primaryStage) {
+    public void start(@Observes @StartupScene final Stage primaryStage) {
         try (InputStream is = this.getClass().getResourceAsStream(MAIN_WINDOW)) {
             final BorderPane root = fxmlLoader.load(is);
             final Scene scene = new Scene(root);

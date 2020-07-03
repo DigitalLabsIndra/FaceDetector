@@ -4,15 +4,16 @@
  **/
 package es.indra.dlabs.dsesteban.detector.opencv;
 
-import java.util.ArrayList;
-import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import javax.annotation.PostConstruct;
+import javax.annotation.PreDestroy;
 import javax.enterprise.context.ApplicationScoped;
+import javax.enterprise.event.Event;
+import javax.inject.Inject;
 
 import org.opencv.core.Mat;
 import org.opencv.videoio.VideoCapture;
@@ -20,7 +21,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import es.indra.dlabs.dsesteban.detector.VideoGrabber;
-import es.indra.dlabs.dsesteban.detector.VideoPlayer;
+import es.indra.dlabs.dsesteban.detector.cdi.GrabberEvent;
 import javafx.scene.image.Image;
 
 /**
@@ -37,12 +38,15 @@ public class OpenCVCameraGrabber implements VideoGrabber {
 
     private static final int DEFAULT_CAMERA = 0;
 
-    private ExecutorService broadcaster;
     private ExecutorService captureExec;
+    @Inject
+    @GrabberEvent
+    Event<Image> frmBroadcaster;
+    @Inject
+    @GrabberEvent
+    Event<GrabberStatus> statusNotifier;
 
     private VideoCapture capture;
-    private List<VideoPlayer> players;
-    private ReadWriteLock playersLock;
     private InternalGrabber grabber;
     private ReadWriteLock grabberLock;
 
@@ -72,18 +76,24 @@ public class OpenCVCameraGrabber implements VideoGrabber {
 
         @Override
         public void run() {
-            LOG.trace("Se inicia la captura activa de imágenes");
-            while (!isCanceled() && capture.isOpened()) {
-                final Mat frame = new Mat();
-                if (!isCanceled() && capture.read(frame)) {
-                    LOG.trace("Image readed");
-                    if (!isCanceled()) {
-                        notifyPlayers(OpenCVUtils.mat2Image(frame));
+            if (capture.open(DEFAULT_CAMERA)) {
+                statusNotifier.fire(GrabberStatus.READY);
+                LOG.trace("Se inicia la captura activa de imágenes");
+                while (!isCanceled() && capture.isOpened()) {
+                    final Mat frame = new Mat();
+                    if (!isCanceled() && capture.read(frame)) {
+                        LOG.trace("Image readed");
+                        if (!isCanceled()) {
+                            notifyPlayers(OpenCVUtils.mat2Image(frame));
+                        }
+                    } else {
+                        LOG.trace("Grabber cancelado o no puede hacer read");
                     }
-                } else {
-                    LOG.trace("Grabber cancelado o no puede hacer read");
                 }
+            } else {
+                LOG.warn("Camera cannot be captured by OpenCV");
             }
+            statusNotifier.fire(GrabberStatus.STOPPED);
             LOG.trace("Se finaliza la captura activa de imágenes");
         }
     }
@@ -94,35 +104,27 @@ public class OpenCVCameraGrabber implements VideoGrabber {
     @PostConstruct
     public void init() {
         capture = new VideoCapture();
-        players = new ArrayList<>();
-        playersLock = new ReentrantReadWriteLock();
-        broadcaster = Executors.newCachedThreadPool();
         captureExec = Executors.newSingleThreadExecutor();
         grabberLock = new ReentrantReadWriteLock();
     }
 
-    private boolean enableCapturing() {
-        boolean result = false;
+    private void enableCapturing() {
+        statusNotifier.fire(GrabberStatus.INITIALIZING);
         grabberLock.writeLock().lock();
         try {
             if (grabber != null) {
                 grabber.cancel();
                 grabber = null;
             }
-            if (capture.open(DEFAULT_CAMERA)) {
-                grabber = new InternalGrabber();
-                captureExec.execute(grabber);
-                result = true;
-            } else {
-                LOG.warn("Camera cannot be captured by OpenCV");
-            }
+            grabber = new InternalGrabber();
+            captureExec.execute(grabber);
         } finally {
             grabberLock.writeLock().unlock();
         }
-        return result;
     }
 
     private void cancelCapturing() {
+        statusNotifier.fire(GrabberStatus.STOPING);
         grabberLock.writeLock().lock();
         try {
             if (grabber != null) {
@@ -139,71 +141,27 @@ public class OpenCVCameraGrabber implements VideoGrabber {
      * TODO: document.
      */
     @Override
+    @PreDestroy
     public void close() {
         cancelCapturing();
         captureExec.shutdown();
-        broadcaster.shutdown();
     }
 
     @Override
-    public void startCapturing(final VideoPlayer player) {
-        LOG.trace("Se ha solicitado añadir un videoplayer: {}", player);
-        boolean initCapture = false;
-        playersLock.writeLock().lock();
-        try {
-            if (players.isEmpty()) {
-                initCapture = true;
-            }
-            players.add(player);
-        } finally {
-            playersLock.writeLock().unlock();
-        }
-        if (initCapture) {
-            enableCapturing();
-        }
+    public void startCapturing() {
+        LOG.trace("Se ha solicitado iniciar la captura de imágenes");
+        enableCapturing();
     }
 
     private void notifyPlayers(final Image image) {
         if (image != null) {
-            playersLock.readLock().lock();
-            try {
-                players.forEach((videoPlayer) -> broadcaster.execute(() -> {
-                    videoPlayer.showImage(image);
-                }));
-            } finally {
-                playersLock.readLock().unlock();
-            }
+            frmBroadcaster.fireAsync(image);
         }
     }
 
     @Override
-    public void stopCapturing(final VideoPlayer player) {
-        LOG.trace("Se ha solicitado quitar un videoplayer: {}", player);
-        boolean stopCapture = false;
-        playersLock.writeLock().lock();
-        try {
-            players.remove(player);
-            if (players.isEmpty()) {
-                stopCapture = true;
-            }
-        } finally {
-            playersLock.writeLock().unlock();
-        }
-        if (stopCapture) {
-            LOG.trace("Ningún player disponible se finaliza la captura");
-            cancelCapturing();
-            LOG.trace("Object OpenCV released");
-        }
-    }
-
-    /**
-     * TODO: document.
-     */
-    public void reset() {
+    public void stopCapturing() {
+        LOG.trace("Se ha solicitado parar la captura de imágenes");
         cancelCapturing();
-        synchronized (players) {
-            players.clear();
-        }
     }
-
 }

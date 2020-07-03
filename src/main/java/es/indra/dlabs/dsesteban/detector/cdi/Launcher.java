@@ -2,10 +2,11 @@
  * Copyright (C) 2020 INDRA FACTORÍA TECNOLÓGICA S.L.U.
  * All rights reserved
  **/
-package es.indra.dlabs.dsesteban.detector;
+package es.indra.dlabs.dsesteban.detector.cdi;
 
 import javax.enterprise.inject.se.SeContainer;
 import javax.enterprise.inject.se.SeContainerInitializer;
+import javax.enterprise.util.AnnotationLiteral;
 
 import org.jboss.weld.environment.se.Weld;
 import org.opencv.core.Core;
@@ -20,12 +21,15 @@ import javafx.stage.Stage;
  */
 public class Launcher extends Application {
 
+    @SuppressWarnings({
+        "PMD.CloseResource", "serial"
+    })
     @Override
     public void start(final Stage primaryStage) throws Exception {
         final SeContainerInitializer initializer = SeContainerInitializer.newInstance();
         initializer.addProperty(Weld.ARCHIVE_ISOLATION_SYSTEM_PROPERTY, Boolean.FALSE);
         final SeContainer container = initializer.initialize();
-        container.select(CamMonitor.class).get().start(primaryStage);
+        container.getBeanManager().fireEvent(primaryStage, new AnnotationLiteral<StartupScene>() {});
     }
 
     /**

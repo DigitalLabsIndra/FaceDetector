@@ -4,11 +4,16 @@
  **/
 package es.indra.dlabs.dsesteban.detector;
 
+import javax.enterprise.event.Observes;
+import javax.enterprise.event.ObservesAsync;
 import javax.inject.Inject;
+import javax.inject.Singleton;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import es.indra.dlabs.dsesteban.detector.VideoGrabber.GrabberStatus;
+import es.indra.dlabs.dsesteban.detector.cdi.GrabberEvent;
 import javafx.application.Platform;
 import javafx.fxml.FXML;
 import javafx.scene.control.Button;
@@ -20,6 +25,7 @@ import javafx.scene.image.ImageView;
  * @version 0.1
  * @since 0.1
  */
+@Singleton
 public class CamMonitorController implements VideoPlayer {
 
     /** Logger. */
@@ -53,20 +59,40 @@ public class CamMonitorController implements VideoPlayer {
             cameraActive = false;
             cameraButton.setText("Start Camera");
             // TODO: desabilitar botón mientras se obtiene handle de cámara
-            grabber.stopCapturing(this);
+            grabber.stopCapturing();
         } else {
             cameraActive = true;
             cameraButton.setText("Stop Camera");
-            grabber.startCapturing(this);
+            grabber.startCapturing();
             // TODO: desabilitar botón mientras se suelta el handlde de cámara
         }
     }
 
     @Override
-    public void showImage(final Image image) {
-        Platform.runLater(() -> {
-            camView.setImage(image);
-        });
+    public void showImage(@ObservesAsync @GrabberEvent final Image image) {
+        Platform.runLater(() -> camView.setImage(image));
+    }
+
+    /**
+     * TODO: document.
+     * @param status
+     *        TODO: document
+     */
+    @SuppressWarnings("PMD.MissingBreakInSwitch")
+    public void showStatus(@Observes @GrabberEvent final GrabberStatus status) {
+        LOG.trace("Se recibe evento de estado: {}", status);
+        boolean disabled;
+        switch (status) {
+            case INITIALIZING:
+            case STOPING:
+                disabled = true;
+                break;
+            case READY:
+            case STOPPED:
+            default:
+                disabled = false;
+        }
+        Platform.runLater(() -> cameraButton.setDisable(disabled));
     }
 
 }
