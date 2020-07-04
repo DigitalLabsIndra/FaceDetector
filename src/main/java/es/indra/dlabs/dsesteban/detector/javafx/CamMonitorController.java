@@ -5,6 +5,11 @@
 package es.indra.dlabs.dsesteban.detector.javafx;
 
 import java.awt.image.BufferedImage;
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.ThreadLocalRandom;
 
 import javax.enterprise.event.Observes;
 import javax.enterprise.event.ObservesAsync;
@@ -20,14 +25,24 @@ import es.indra.dlabs.dsesteban.detector.VideoGrabber.GrabberStatus;
 import es.indra.dlabs.dsesteban.detector.cdi.Detector;
 import es.indra.dlabs.dsesteban.detector.cdi.DetectorEvent;
 import es.indra.dlabs.dsesteban.detector.cdi.GrabberEvent;
+import javafx.animation.KeyFrame;
+import javafx.animation.KeyValue;
+import javafx.animation.ParallelTransition;
+import javafx.animation.Timeline;
+import javafx.animation.TranslateTransition;
 import javafx.application.Platform;
 import javafx.fxml.FXML;
-import javafx.scene.canvas.Canvas;
-import javafx.scene.canvas.GraphicsContext;
+import javafx.fxml.FXMLLoader;
+import javafx.geometry.Rectangle2D;
 import javafx.scene.control.Button;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 import javafx.scene.layout.BorderPane;
+import javafx.scene.layout.StackPane;
+import javafx.scene.paint.Color;
+import javafx.scene.shape.Rectangle;
+import javafx.scene.text.Text;
+import javafx.util.Duration;
 
 /**
  * TODO: document.
@@ -40,12 +55,15 @@ public class CamMonitorController {
     /** Logger. */
     private static final Logger LOG = LoggerFactory.getLogger(CamMonitorController.class);
 
+    private static final String FACE_TEMPLATE = "/design/Face.fxml";
+    private static final int MAX_FACES_ACTIVES = 3;
+
     @FXML
     Button cameraButton;
     @FXML
     ImageView camView;
     @FXML
-    Canvas overlay;
+    StackPane overlayPane;
     @FXML
     BorderPane waitingPane;
     @FXML
@@ -53,9 +71,13 @@ public class CamMonitorController {
 
     @Inject
     VideoGrabber grabber;
+    @Inject
+    FXMLLoader fxmlLoader;
 
+    final ConcurrentMap<String, StackPane> faces = new ConcurrentHashMap<>();
     private boolean cameraActive;
     private boolean overlaySized;
+    private Rectangle2D overlaySize;
 
     /**
      * TODO: document.
@@ -91,8 +113,7 @@ public class CamMonitorController {
         Platform.runLater(() -> {
             if (!overlaySized) {
                 overlaySized = true;
-                overlay.setHeight(image.getHeight());
-                overlay.setWidth(image.getWidth());
+                overlaySize = new Rectangle2D(0, 0, image.getWidth(), image.getHeight());
             }
             final Image imageFx = JavaFXUtils.mat2Image(image);
             if (imageFx != null) {
@@ -134,18 +155,50 @@ public class CamMonitorController {
         }
     }
 
+    private static final Color[] COLORS = {
+        Color.AQUAMARINE, Color.BLACK, Color.BURLYWOOD, Color.CHARTREUSE
+    };
+
+    private StackPane createFace(final String name) {
+        StackPane face = null;
+        // TODO: obtener el Inputstream cacheado y reusar
+        try (InputStream is = this.getClass().getResourceAsStream(FACE_TEMPLATE)) {
+            face = fxmlLoader.load(is);
+            final Text text = (Text)face.getChildrenUnmodifiable().get(0);
+            text.setText(name);
+
+            final Color color = COLORS[ThreadLocalRandom.current().nextInt(COLORS.length)];
+            text.setFill(color);
+            final Rectangle rect = (Rectangle)face.getChildrenUnmodifiable().get(1);
+            rect.setStroke(color);
+            overlayPane.getChildren().add(face);
+        } catch (IOException ex) {
+            LOG.error("Face component cannot be created: {}", ex.getMessage());
+            LOG.debug(ex.getMessage(), ex);
+        }
+        return face;
+    }
+
     /**
      * TODO: document.
-     * @param face
+     * @param faceRect
      *        TODO: document
      */
-    public void showFace(@ObservesAsync @DetectorEvent final Face face) {
+    public void showFace(@ObservesAsync @DetectorEvent final Face faceRect) {
         Platform.runLater(() -> {
-            final GraphicsContext gc = overlay.getGraphicsContext2D();
-            gc.clearRect(0, 0, overlay.getWidth(), overlay.getHeight());
-            gc.setLineWidth(2d);
-            final double x = 640 - face.x - face.width;
-            gc.strokeRect(x, face.y, face.width, face.height);
+            final StackPane face = faces.computeIfAbsent(faceRect.name,
+                (name) -> (faces.size() < MAX_FACES_ACTIVES) ? createFace(name) : null);
+            if (face != null) {
+                final Rectangle rect = (Rectangle)face.getChildrenUnmodifiable().get(1);
+                final Timeline wt = new Timeline(new KeyFrame(Duration.millis(100),
+                    new KeyValue(rect.widthProperty(), faceRect.width),
+                    new KeyValue(rect.heightProperty(), faceRect.height)));
+                final TranslateTransition tt = new TranslateTransition(Duration.millis(100), face);
+                tt.setToX((overlaySize.getWidth() - faceRect.width) / 2d - faceRect.x);
+                tt.setToY(faceRect.y - (overlaySize.getHeight() - faceRect.height) / 2d);
+                final ParallelTransition pt = new ParallelTransition(tt, wt);
+                pt.play();
+            }
         });
     }
 

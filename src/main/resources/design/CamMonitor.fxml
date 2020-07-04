@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
 <?import javafx.geometry.Insets?>
-<?import javafx.scene.canvas.Canvas?>
 <?import javafx.scene.control.Button?>
 <?import javafx.scene.control.Label?>
 <?import javafx.scene.control.ProgressBar?>
@@ -30,10 +29,9 @@
             <center>
                 <VBox alignment="CENTER" prefHeight="600.0" prefWidth="800.0" BorderPane.alignment="CENTER">
                     <children>
-                        <StackPane>
+                        <StackPane fx:id="overlayPane">
                             <children>
                                 <ImageView fx:id="camView" scaleX="-1.0" />
-                                <Canvas fx:id="overlay" />
                             </children>
                         </StackPane>
                     </children>
