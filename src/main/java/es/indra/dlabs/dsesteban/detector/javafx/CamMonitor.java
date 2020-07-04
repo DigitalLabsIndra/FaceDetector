@@ -7,6 +7,7 @@ package es.indra.dlabs.dsesteban.detector.javafx;
 import java.io.IOException;
 import java.io.InputStream;
 
+import javax.enterprise.event.Event;
 import javax.enterprise.event.Observes;
 import javax.inject.Inject;
 import javax.inject.Singleton;
@@ -15,10 +16,13 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import es.indra.dlabs.dsesteban.detector.VideoGrabber;
+import es.indra.dlabs.dsesteban.detector.cdi.Detector;
+import es.indra.dlabs.dsesteban.detector.cdi.Detector.PlatformActions;
+import es.indra.dlabs.dsesteban.detector.cdi.DetectorEvent;
 import es.indra.dlabs.dsesteban.detector.cdi.StartupScene;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Scene;
-import javafx.scene.layout.BorderPane;
+import javafx.scene.layout.StackPane;
 import javafx.stage.Stage;
 import javafx.stage.WindowEvent;
 
@@ -41,6 +45,10 @@ public class CamMonitor {
     @Inject
     VideoGrabber grabber;
 
+    @Inject
+    @DetectorEvent
+    Event<Detector.PlatformActions> evtDetector;
+
     /**
      * TODO: document.
      * @param primaryStage
@@ -49,7 +57,7 @@ public class CamMonitor {
     @SuppressWarnings("PMD.AvoidCatchingGenericException")
     public void start(@Observes @StartupScene final Stage primaryStage) {
         try (InputStream is = this.getClass().getResourceAsStream(MAIN_WINDOW)) {
-            final BorderPane root = fxmlLoader.load(is);
+            final StackPane root = fxmlLoader.load(is);
             final Scene scene = new Scene(root);
             primaryStage.setTitle("Face Detector");
             primaryStage.setScene(scene);
@@ -63,10 +71,10 @@ public class CamMonitor {
                 }
             });
             primaryStage.show();
+            evtDetector.fireAsync(PlatformActions.START);
         } catch (IOException ex) {
             LOG.error("Main window cannot be created: {}", ex.getMessage());
             LOG.debug(ex.getMessage(), ex);
         }
-
     }
 }

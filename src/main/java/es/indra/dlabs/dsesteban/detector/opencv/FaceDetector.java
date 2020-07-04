@@ -7,7 +7,6 @@ package es.indra.dlabs.dsesteban.detector.opencv;
 import java.time.Duration;
 import java.time.Instant;
 
-import javax.annotation.PostConstruct;
 import javax.enterprise.event.Event;
 import javax.enterprise.event.ObservesAsync;
 import javax.inject.Inject;
@@ -36,6 +35,8 @@ public class FaceDetector {
     /** Logger. */
     private static final Logger LOG = LoggerFactory.getLogger(FaceDetector.class);
 
+    private static final String FACE_HAARCASCADE = "data/haarcascades/haarcascade_frontalface_alt.xml";
+
     private static final Duration LAPSUS = Duration.ofMillis(100);
     private static final double SCALE = 0.25;
 
@@ -48,9 +49,11 @@ public class FaceDetector {
     @DetectorEvent
     Event<Face> eventFaces;
 
-    @PostConstruct
-    void init() {
-        faceCascade = new CascadeClassifier("data/haarcascades/haarcascade_frontalface_default.xml");
+    CascadeClassifier getClassifier() {
+        if (faceCascade == null) {
+            faceCascade = new CascadeClassifier(FACE_HAARCASCADE);
+        }
+        return faceCascade;
     }
 
     /**
@@ -69,9 +72,7 @@ public class FaceDetector {
             Imgproc.cvtColor(matRed, grayFrame, Imgproc.COLOR_BGR2GRAY);
             Imgproc.equalizeHist(grayFrame, grayFrame);
             final MatOfRect faces = new MatOfRect();
-            faceCascade.detectMultiScale(grayFrame, faces, 1.1, 2, 0);
-
-            // TODO: añadir tracker a compilación de java
+            getClassifier().detectMultiScale(grayFrame, faces, 1.1, 2, 0);
 
             final Instant after = Instant.now();
             accumulator = accumulator.plus(Duration.between(now, after));

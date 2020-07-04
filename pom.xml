@@ -48,6 +48,7 @@
         <version.opencv>4.3.0</version.opencv>
         <version.javafx>14.0.1</version.javafx>
         <version.commons-io>2.7</version.commons-io>
+        <version.javacv>1.5.3</version.javacv>
 
         <opencv.dir>${basedir}</opencv.dir>
     </properties>
@@ -101,12 +102,16 @@
 
 
         <dependency>
-            <groupId>org.opencv</groupId>
-            <artifactId>opencv</artifactId>
-            <version>${version.opencv}</version>
-            <scope>system</scope>
-            <systemPath>${opencv.dir}/libs/opencv-430.jar</systemPath>
+            <groupId>org.bytedeco</groupId>
+            <artifactId>javacv</artifactId>
+            <version>${version.javacv}</version>
         </dependency>
+        <dependency>
+            <groupId>org.bytedeco</groupId>
+            <artifactId>javacv-platform</artifactId>
+            <version>${version.javacv}</version>
+        </dependency>
+
         <dependency>
             <groupId>org.jboss.weld.se</groupId>
             <artifactId>weld-se-core</artifactId>

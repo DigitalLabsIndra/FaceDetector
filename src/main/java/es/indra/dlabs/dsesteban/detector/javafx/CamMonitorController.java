@@ -17,6 +17,7 @@ import org.slf4j.LoggerFactory;
 import es.indra.dlabs.dsesteban.detector.Face;
 import es.indra.dlabs.dsesteban.detector.VideoGrabber;
 import es.indra.dlabs.dsesteban.detector.VideoGrabber.GrabberStatus;
+import es.indra.dlabs.dsesteban.detector.cdi.Detector;
 import es.indra.dlabs.dsesteban.detector.cdi.DetectorEvent;
 import es.indra.dlabs.dsesteban.detector.cdi.GrabberEvent;
 import javafx.application.Platform;
@@ -26,6 +27,7 @@ import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.control.Button;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
+import javafx.scene.layout.BorderPane;
 
 /**
  * TODO: document.
@@ -44,6 +46,10 @@ public class CamMonitorController {
     ImageView camView;
     @FXML
     Canvas overlay;
+    @FXML
+    BorderPane waitingPane;
+    @FXML
+    BorderPane operPane;
 
     @Inject
     VideoGrabber grabber;
@@ -97,6 +103,39 @@ public class CamMonitorController {
 
     /**
      * TODO: document.
+     * @param status
+     *        TODO: document
+     */
+    public void loadingState(@Observes @DetectorEvent final Detector.PlatformStatus status) {
+        switch (status) {
+            case READY:
+                Platform.runLater(() -> {
+                    waitingPane.setVisible(false);
+                    cameraButton.setDisable(false);
+                    operPane.setVisible(true);
+                });
+                break;
+            case ERROR:
+                Platform.runLater(() -> {
+                    // TODO: poner un mnesaje de error en condiciones
+                    waitingPane.setVisible(false);
+                    cameraButton.setDisable(true);
+                    operPane.setVisible(false);
+                });
+                break;
+            case INITIALIZING:
+                Platform.runLater(() -> {
+                    waitingPane.setVisible(true);
+                    cameraButton.setDisable(true);
+                    operPane.setVisible(false);
+                });
+                break;
+            default:
+        }
+    }
+
+    /**
+     * TODO: document.
      * @param face
      *        TODO: document
      */
@@ -105,7 +144,7 @@ public class CamMonitorController {
             final GraphicsContext gc = overlay.getGraphicsContext2D();
             gc.clearRect(0, 0, overlay.getWidth(), overlay.getHeight());
             gc.setLineWidth(2d);
-            double x = 640 - face.x - face.width;
+            final double x = 640 - face.x - face.width;
             gc.strokeRect(x, face.y, face.width, face.height);
         });
     }
