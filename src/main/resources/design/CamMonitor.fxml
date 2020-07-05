@@ -50,6 +50,23 @@
                     </children>
                 </HBox>
             </bottom>
+         <right>
+            <VBox fx:id="detectorsPane" prefWidth="200.0" spacing="10.0" BorderPane.alignment="CENTER">
+               <children>
+                  <Label text="Detectors">
+                     <font>
+                        <Font name="System Bold" size="14.0" />
+                     </font>
+                  </Label>
+               </children>
+               <padding>
+                  <Insets left="20.0" top="20.0" />
+               </padding>
+               <opaqueInsets>
+                  <Insets />
+               </opaqueInsets>
+            </VBox>
+         </right>
         </BorderPane>
     </children>
 </StackPane>

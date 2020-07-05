@@ -18,6 +18,10 @@ public class Face {
     /**
      * TODO: document.
      */
+    public String meta;
+    /**
+     * TODO: document.
+     */
     public double x;
     /**
      * TODO: document.

@@ -45,7 +45,6 @@
         <version.junit>5.6.2</version.junit>
         <version.weldse>3.1.4.Final</version.weldse>
         <version.cdi>2.0.2</version.cdi>
-        <version.opencv>4.3.0</version.opencv>
         <version.javafx>14.0.1</version.javafx>
         <version.commons-io>2.7</version.commons-io>
         <version.javacv>1.5.3</version.javacv>
@@ -98,18 +97,6 @@
             <groupId>org.apache.logging.log4j</groupId>
             <artifactId>log4j-slf4j-impl</artifactId>
             <scope>runtime</scope>
-        </dependency>
-
-
-        <dependency>
-            <groupId>org.bytedeco</groupId>
-            <artifactId>javacv</artifactId>
-            <version>${version.javacv}</version>
-        </dependency>
-        <dependency>
-            <groupId>org.bytedeco</groupId>
-            <artifactId>javacv-platform</artifactId>
-            <version>${version.javacv}</version>
         </dependency>
 
         <dependency>
@@ -431,4 +418,76 @@
             </plugin>
         </plugins>
     </build>
+
+    <profiles>
+        <profile>
+            <id>fast-win</id>
+            <properties>
+                <version.openblas>0.3.9</version.openblas>
+                <version.opencv>4.3.0</version.opencv>
+            </properties>
+            <dependencies>
+                <dependency>
+                    <groupId>org.bytedeco</groupId>
+                    <artifactId>javacv</artifactId>
+                    <version>${version.javacv}</version>
+                    <exclusions>
+                        <exclusion>
+                            <groupId>*</groupId>
+                            <artifactId>*</artifactId>
+                        </exclusion>
+                    </exclusions>
+                </dependency>
+                <dependency>
+                    <groupId>org.bytedeco</groupId>
+                    <artifactId>javacpp</artifactId>
+                    <version>${version.javacv}</version>
+                </dependency>
+                <dependency>
+                    <groupId>org.bytedeco</groupId>
+                    <artifactId>javacpp</artifactId>
+                    <version>${version.javacv}</version>
+                    <classifier>windows-x86_64</classifier>
+                    <scope>runtime</scope>
+                </dependency>
+                <dependency>
+                    <groupId>org.bytedeco</groupId>
+                    <artifactId>openblas</artifactId>
+                    <version>${version.openblas}-${version.javacv}</version>
+                    <classifier>windows-x86_64</classifier>
+                    <scope>runtime</scope>
+                </dependency>
+                <dependency>
+                    <groupId>org.bytedeco</groupId>
+                    <artifactId>opencv</artifactId>
+                    <version>${version.opencv}-${version.javacv}</version>
+                </dependency>
+                <dependency>
+                    <groupId>org.bytedeco</groupId>
+                    <artifactId>opencv</artifactId>
+                    <version>${version.opencv}-${version.javacv}</version>
+                    <classifier>windows-x86_64</classifier>
+                    <scope>runtime</scope>
+                </dependency>
+            </dependencies>
+        </profile>
+        <profile>
+            <id>full</id>
+            <activation>
+                <activeByDefault>true</activeByDefault>
+            </activation>
+            <dependencies>
+                <dependency>
+                    <groupId>org.bytedeco</groupId>
+                    <artifactId>javacv</artifactId>
+                    <version>${version.javacv}</version>
+                </dependency>
+                <dependency>
+                    <groupId>org.bytedeco</groupId>
+                    <artifactId>javacv-platform</artifactId>
+                    <version>${version.javacv}</version>
+                </dependency>
+            </dependencies>
+        </profile>
+    </profiles>
 </project>

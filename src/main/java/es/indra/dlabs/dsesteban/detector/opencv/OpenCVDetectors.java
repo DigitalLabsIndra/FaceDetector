@@ -16,6 +16,7 @@ import org.slf4j.LoggerFactory;
 
 import es.indra.dlabs.dsesteban.detector.cdi.Detector;
 import es.indra.dlabs.dsesteban.detector.cdi.DetectorEvent;
+import es.indra.dlabs.dsesteban.detector.opencv.OpenCVDetector.DetectorActions;
 
 /**
  * TODO: document.
@@ -31,12 +32,15 @@ public class OpenCVDetectors implements Detector {
     private boolean platformInit;
 
     @Inject
-    FaceDetector faceDetector;
+    CascadeFaceDetector faceDetector;
     @Inject
     OpenCVCameraGrabber grabber;
     @Inject
     @DetectorEvent
-    Event<Detector.PlatformStatus> evtDetector;
+    Event<Detector.PlatformStatus> evtPlatform;
+    @Inject
+    @DetectorEvent
+    Event<OpenCVDetector.DetectorActions> evtDetector;
 
     @SuppressWarnings("PMD.AvoidCatchingThrowable")
     void start(@ObservesAsync @DetectorEvent final PlatformActions event) {
@@ -45,17 +49,18 @@ public class OpenCVDetectors implements Detector {
             case START:
                 if (!platformInit) {
                     LOG.debug("Inicializando plataforma OpenCV");
-                    evtDetector.fire(PlatformStatus.INITIALIZING);
+                    evtPlatform.fire(PlatformStatus.INITIALIZING);
                     try {
                         Loader.load(opencv_java.class);
+                        evtDetector.fire(DetectorActions.START);
                         platformInit = true;
                         LOG.debug("Plataforma OpenCV inicializada");
-                        evtDetector.fire(PlatformStatus.READY);
+                        evtPlatform.fire(PlatformStatus.READY);
                     } catch (Throwable t) {
                         LOG.error("Error cargando plataforma: {}", t.getMessage());
                         LOG.debug(t.getMessage(), t);
                         platformInit = false;
-                        evtDetector.fire(PlatformStatus.ERROR);
+                        evtPlatform.fire(PlatformStatus.ERROR);
                     }
                 }
                 break;
