@@ -423,11 +423,10 @@
         <profile>
             <id>fast-win</id>
             <properties>
-                <version.openblas>0.3.9</version.openblas>
                 <version.opencv>4.3.0</version.opencv>
             </properties>
             <dependencies>
-                <dependency>
+                <!-- <dependency>
                     <groupId>org.bytedeco</groupId>
                     <artifactId>javacv</artifactId>
                     <version>${version.javacv}</version>
@@ -437,37 +436,11 @@
                             <artifactId>*</artifactId>
                         </exclusion>
                     </exclusions>
-                </dependency>
-                <dependency>
-                    <groupId>org.bytedeco</groupId>
-                    <artifactId>javacpp</artifactId>
-                    <version>${version.javacv}</version>
-                </dependency>
-                <dependency>
-                    <groupId>org.bytedeco</groupId>
-                    <artifactId>javacpp</artifactId>
-                    <version>${version.javacv}</version>
-                    <classifier>windows-x86_64</classifier>
-                    <scope>runtime</scope>
-                </dependency>
-                <dependency>
-                    <groupId>org.bytedeco</groupId>
-                    <artifactId>openblas</artifactId>
-                    <version>${version.openblas}-${version.javacv}</version>
-                    <classifier>windows-x86_64</classifier>
-                    <scope>runtime</scope>
-                </dependency>
+                </dependency> -->
                 <dependency>
                     <groupId>org.bytedeco</groupId>
                     <artifactId>opencv</artifactId>
                     <version>${version.opencv}-${version.javacv}</version>
-                </dependency>
-                <dependency>
-                    <groupId>org.bytedeco</groupId>
-                    <artifactId>opencv</artifactId>
-                    <version>${version.opencv}-${version.javacv}</version>
-                    <classifier>windows-x86_64</classifier>
-                    <scope>runtime</scope>
                 </dependency>
             </dependencies>
         </profile>

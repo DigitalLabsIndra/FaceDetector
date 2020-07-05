@@ -4,13 +4,16 @@
  **/
 package es.indra.dlabs.dsesteban.detector.javafx;
 
-import java.awt.image.BufferedImage;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
 
 import javax.enterprise.event.Event;
 import javax.enterprise.event.Observes;
@@ -21,15 +24,17 @@ import javax.inject.Singleton;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import es.indra.dlabs.dsesteban.detector.Face;
-import es.indra.dlabs.dsesteban.detector.VideoGrabber;
-import es.indra.dlabs.dsesteban.detector.VideoGrabber.GrabberStatus;
 import es.indra.dlabs.dsesteban.detector.cdi.Detector;
 import es.indra.dlabs.dsesteban.detector.cdi.DetectorAction;
 import es.indra.dlabs.dsesteban.detector.cdi.DetectorAction.DetectorActions;
 import es.indra.dlabs.dsesteban.detector.cdi.DetectorEvent;
 import es.indra.dlabs.dsesteban.detector.cdi.DetectorInfo;
-import es.indra.dlabs.dsesteban.detector.cdi.GrabberEvent;
+import es.indra.dlabs.dsesteban.detector.face.Face;
+import es.indra.dlabs.dsesteban.detector.grabber.GrabberEvent;
+import es.indra.dlabs.dsesteban.detector.grabber.VideoFrame;
+import es.indra.dlabs.dsesteban.detector.grabber.VideoGrabber;
+import es.indra.dlabs.dsesteban.detector.grabber.VideoGrabber.GrabberStatus;
+import javafx.animation.FadeTransition;
 import javafx.application.Platform;
 import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
@@ -42,12 +47,14 @@ import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
+import javafx.util.Duration;
 
 /**
  * TODO: document.
  * @version 0.1
  * @since 0.1
  */
+@SuppressWarnings("PMD.DoNotUseThreads")
 @Singleton
 public class CamMonitorController {
 
@@ -58,6 +65,13 @@ public class CamMonitorController {
     private static final Color[] COLORS = {
         Color.AQUAMARINE, Color.BURLYWOOD, Color.CHARTREUSE, Color.CORAL, Color.GAINSBORO
     };
+    private static final long LASTING_FACE = 3000;
+    private static final Duration FADING_TIME = Duration.millis(1000);
+
+    private class FaceBlock {
+        FaceComponent faceComp;
+        ScheduledFuture<?> schedule;
+    }
 
     @FXML
     Button cameraButton;
@@ -81,11 +95,12 @@ public class CamMonitorController {
     Event<DetectorAction> evtDetectorAction;
 
     private final List<String> detectors = Collections.synchronizedList(new ArrayList<>());
-    private final ConcurrentMap<String, FaceComponent> faces = new ConcurrentHashMap<>();
+    private final ConcurrentMap<String, FaceBlock> faces = new ConcurrentHashMap<>();
     private boolean cameraActive;
     private boolean overlaySized;
     private Rectangle2D overlaySize;
     private final List<Color> availableColors = new ArrayList<>();
+    private ScheduledExecutorService scheduler;
 
     /**
      * TODO: document.
@@ -93,6 +108,7 @@ public class CamMonitorController {
     @FXML
     public void initialize() {
         LOG.trace("{} has been initialized", this.getClass());
+        scheduler = Executors.newScheduledThreadPool(0);
     }
 
     void receiveDetectors(@Observes @DetectorEvent final DetectorInfo info) {
@@ -126,7 +142,10 @@ public class CamMonitorController {
         } else {
             cameraActive = true;
             cameraButton.setText("Stop Camera");
-            faces.values().forEach((face) -> overlayPane.getChildren().remove(face));
+            faces.values().forEach((face) -> {
+                face.schedule.cancel(false);
+                overlayPane.getChildren().remove(face.faceComp);
+            });
             faces.clear();
             availableColors.addAll(Arrays.asList(COLORS));
             grabber.startCapturing();
@@ -135,17 +154,17 @@ public class CamMonitorController {
 
     /**
      * TODO: document.
-     * @param image
+     * @param frame
      *        TODO: document
      */
     @SuppressWarnings("PMD.MissingOverride")
-    public void showImage(@ObservesAsync @GrabberEvent final BufferedImage image) {
+    public void showImage(@ObservesAsync @GrabberEvent final VideoFrame frame) {
         Platform.runLater(() -> {
             if (!overlaySized) {
                 overlaySized = true;
-                overlaySize = new Rectangle2D(0, 0, image.getWidth(), image.getHeight());
+                overlaySize = new Rectangle2D(0, 0, frame.image.getWidth(), frame.image.getHeight());
             }
-            final Image imageFx = JavaFXUtils.mat2Image(image);
+            final Image imageFx = JavaFXUtils.mat2Image(frame.image);
             if (imageFx != null) {
                 camView.setImage(imageFx);
             }
@@ -185,7 +204,8 @@ public class CamMonitorController {
         }
     }
 
-    private FaceComponent createFace(final String name, final String meta) {
+    private FaceBlock createFace(final String name, final String meta) {
+        final FaceBlock result = new FaceBlock();
         final FaceComponent face = new FaceComponent();
         face.setFaceName(name);
         face.setFaceMeta(meta);
@@ -194,8 +214,9 @@ public class CamMonitorController {
             face.setFaceColor(color);
         }
         face.setOverlaySize(overlaySize);
+        result.faceComp = face;
         Platform.runLater(() -> overlayPane.getChildren().add(face));
-        return face;
+        return result;
     }
 
     /**
@@ -204,11 +225,28 @@ public class CamMonitorController {
      *        TODO: document
      */
     public void showFace(@ObservesAsync @DetectorEvent final Face faceRect) {
-        final FaceComponent face = faces.computeIfAbsent(faceRect.name,
+        final FaceBlock face = faces.computeIfAbsent(faceRect.name,
             (name) -> (faces.size() < MAX_FACES_ACTIVES) ? createFace(name, null) : null);
         if (face != null) {
-            face.setFaceMeta(faceRect.meta);
-            face.resizeAndMove(faceRect.x, faceRect.y, faceRect.width, faceRect.height);
+            face.faceComp.setFaceMeta(faceRect.meta);
+            face.faceComp.resizeAndMove(faceRect.x, faceRect.y, faceRect.width, faceRect.height);
+            if (face.schedule != null) {
+                face.schedule.cancel(false);
+            }
+            face.schedule = scheduler.schedule(() -> removeFace(faceRect.name), LASTING_FACE, TimeUnit.MILLISECONDS);
+        }
+    }
+
+    private void removeFace(final String face) {
+        final FaceBlock removed = faces.remove(face);
+        if (removed != null) {
+            Platform.runLater(() -> {
+                final FadeTransition trans = new FadeTransition(FADING_TIME, removed.faceComp);
+                trans.setFromValue(1.0);
+                trans.setToValue(0.0);
+                trans.setOnFinished((e) -> overlayPane.getChildren().remove(removed.faceComp));
+                trans.play();
+            });
         }
     }
 

@@ -15,11 +15,11 @@ import javax.inject.Singleton;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import es.indra.dlabs.dsesteban.detector.VideoGrabber;
 import es.indra.dlabs.dsesteban.detector.cdi.Detector;
 import es.indra.dlabs.dsesteban.detector.cdi.Detector.PlatformActions;
 import es.indra.dlabs.dsesteban.detector.cdi.DetectorEvent;
 import es.indra.dlabs.dsesteban.detector.cdi.StartupScene;
+import es.indra.dlabs.dsesteban.detector.grabber.VideoGrabber;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Scene;
 import javafx.scene.layout.StackPane;

@@ -22,11 +22,11 @@ import org.opencv.dnn.Net;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import es.indra.dlabs.dsesteban.detector.Face;
 import es.indra.dlabs.dsesteban.detector.cdi.DetectorAction;
 import es.indra.dlabs.dsesteban.detector.cdi.DetectorEvent;
 import es.indra.dlabs.dsesteban.detector.cdi.DetectorInfo;
-import es.indra.dlabs.dsesteban.detector.cdi.GrabberEvent;
+import es.indra.dlabs.dsesteban.detector.face.Face;
+import es.indra.dlabs.dsesteban.detector.grabber.GrabberEvent;
 import es.indra.dlabs.dsesteban.detector.opencv.OpenCVDetector.DetectorActions;
 
 /**
@@ -35,18 +35,18 @@ import es.indra.dlabs.dsesteban.detector.opencv.OpenCVDetector.DetectorActions;
  * @since 0.1
  */
 @Singleton
-public class DnnGrayFaceDetector {
+public class DnnTFFaceDetector {
 
     /** Logger. */
-    private static final Logger LOG = LoggerFactory.getLogger(DnnGrayFaceDetector.class);
+    private static final Logger LOG = LoggerFactory.getLogger(DnnTFFaceDetector.class);
 
     private static final String FACE_CONFIG = "data/dnn/opencv_face_detector.pbtxt";
     private static final String FACE_MODEL = "data/dnn/opencv_face_detector_uint8.pb";
-    private static final String ID = "Dnn Uint8 Detector";
+    private static final String ID = "Dnn TensorFlow Detector";
     private static final double CONFIDENCE_THRESHOLD = 0.7;
     private static final int TICKS_COUNT = 20;
 
-    private static final Duration LAPSUS = Duration.ofMillis(200);
+    private static final Duration LAPSUS = Duration.ofMillis(500);
 
     private Net net;
     private Instant lastProcessed = Instant.MIN;
@@ -120,18 +120,20 @@ public class DnnGrayFaceDetector {
                     ticks = 0;
                 }
 
+                int j = 0;
                 final Mat detection = output.reshape(1, (int)output.total() / 7);
                 for (int i = 0; i < detection.rows(); ++i) {
                     final double confidence = detection.get(i, 2)[0];
                     if (confidence > CONFIDENCE_THRESHOLD) {
                         final Face face = new Face();
-                        face.name = "faceZ";
+                        face.name = "faceZ-" + j;
                         face.x = detection.get(i, 3)[0] * frame.width();
                         face.y = detection.get(i, 4)[0] * frame.height();
                         face.width = detection.get(i, 5)[0] * frame.width() - face.x;
                         face.height = detection.get(i, 6)[0] * frame.height() - face.y;
                         face.meta = String.format(Locale.US, "conf: %f", confidence);
                         eventFaces.fireAsync(face);
+                        j++;
                     }
                 }
             }

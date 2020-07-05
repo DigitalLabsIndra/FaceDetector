@@ -21,8 +21,9 @@ import org.opencv.videoio.VideoCapture;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import es.indra.dlabs.dsesteban.detector.VideoGrabber;
-import es.indra.dlabs.dsesteban.detector.cdi.GrabberEvent;
+import es.indra.dlabs.dsesteban.detector.grabber.GrabberEvent;
+import es.indra.dlabs.dsesteban.detector.grabber.VideoFrame;
+import es.indra.dlabs.dsesteban.detector.grabber.VideoGrabber;
 
 /**
  * TODO: document.
@@ -41,7 +42,7 @@ public class OpenCVCameraGrabber implements VideoGrabber {
     private ExecutorService captureExec;
     @Inject
     @GrabberEvent
-    Event<BufferedImage> eventPlayers;
+    Event<VideoFrame> eventPlayers;
     @Inject
     @GrabberEvent
     Event<Mat> eventProcessors;
@@ -79,6 +80,7 @@ public class OpenCVCameraGrabber implements VideoGrabber {
 
         @Override
         public void run() {
+            long id = 0;
             if (capture.open(DEFAULT_CAMERA)) {
                 statusNotifier.fire(GrabberStatus.READY);
                 LOG.trace("Se inicia la captura activa de imágenes");
@@ -86,7 +88,7 @@ public class OpenCVCameraGrabber implements VideoGrabber {
                     final Mat frame = new Mat();
                     if (!isCanceled() && capture.read(frame)) {
                         if (!isCanceled()) {
-                            notifyPlayers(OpenCVUtils.matToBufferedImage(frame));
+                            notifyPlayers(id++, OpenCVUtils.matToBufferedImage(frame));
                             notifyProcessors(frame);
                         }
                     } else {
@@ -156,9 +158,12 @@ public class OpenCVCameraGrabber implements VideoGrabber {
         enableCapturing();
     }
 
-    private void notifyPlayers(final BufferedImage image) {
+    private void notifyPlayers(final long id, final BufferedImage image) {
         if (image != null) {
-            eventPlayers.fireAsync(image);
+            final VideoFrame videoFrame = new VideoFrame();
+            videoFrame.id = id;
+            videoFrame.image = image;
+            eventPlayers.fireAsync(videoFrame);
         }
     }
 

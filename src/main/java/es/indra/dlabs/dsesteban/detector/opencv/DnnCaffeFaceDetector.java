@@ -6,6 +6,7 @@ package es.indra.dlabs.dsesteban.detector.opencv;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Locale;
 
 import javax.enterprise.event.Event;
 import javax.enterprise.event.Observes;
@@ -14,11 +15,10 @@ import javax.inject.Inject;
 import javax.inject.Singleton;
 
 import org.opencv.core.Mat;
-import org.opencv.core.MatOfRect;
-import org.opencv.core.Rect;
+import org.opencv.core.Scalar;
 import org.opencv.core.Size;
-import org.opencv.imgproc.Imgproc;
-import org.opencv.objdetect.CascadeClassifier;
+import org.opencv.dnn.Dnn;
+import org.opencv.dnn.Net;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -35,19 +35,20 @@ import es.indra.dlabs.dsesteban.detector.opencv.OpenCVDetector.DetectorActions;
  * @since 0.1
  */
 @Singleton
-public class CascadeFaceDetector {
+public class DnnCaffeFaceDetector {
 
     /** Logger. */
-    private static final Logger LOG = LoggerFactory.getLogger(CascadeFaceDetector.class);
+    private static final Logger LOG = LoggerFactory.getLogger(DnnCaffeFaceDetector.class);
 
-    private static final String FACE_HAARCASCADE = "data/haarcascades/haarcascade_frontalface_alt.xml";
-    private static final String ID = "Cascade Detector";
-    private static final int TICKS_COUNT = 40;
+    private static final String FACE_PROTO = "data/dnn/deploy.prototxt";
+    private static final String FACE_CAFFE = "data/dnn/res10_300x300_ssd_iter_140000.caffemodel";
+    private static final String ID = "Dnn Caffe Detector";
+    private static final double CONFIDENCE_THRESHOLD = 0.6;
+    private static final int TICKS_COUNT = 20;
 
     private static final Duration LAPSUS = Duration.ofMillis(500);
-    private static final double SCALE = 0.25;
 
-    private CascadeClassifier faceCascade;
+    private Net net;
     private Instant lastProcessed = Instant.MIN;
     private Duration accumulator = Duration.ZERO;
     private int ticks;
@@ -64,7 +65,7 @@ public class CascadeFaceDetector {
     void initialize(@Observes @DetectorEvent final DetectorActions action) {
         switch (action) {
             case START:
-                faceCascade = new CascadeClassifier(FACE_HAARCASCADE);
+                net = Dnn.readNetFromCaffe(FACE_PROTO, FACE_CAFFE);
                 LOG.info("{} has been initialized", ID);
                 evtInfo.fire(new DetectorInfo(ID));
                 initialized = true;
@@ -104,13 +105,9 @@ public class CascadeFaceDetector {
             if (Duration.between(lastProcessed, now).compareTo(LAPSUS) > 0) {
                 lastProcessed = now;
 
-                final Mat matRed = new Mat();
-                Imgproc.resize(frame, matRed, new Size(), SCALE, SCALE, Imgproc.INTER_AREA);
-                final Mat grayFrame = new Mat();
-                Imgproc.cvtColor(matRed, grayFrame, Imgproc.COLOR_BGR2GRAY);
-                Imgproc.equalizeHist(grayFrame, grayFrame);
-                final MatOfRect faces = new MatOfRect();
-                faceCascade.detectMultiScale(grayFrame, faces, 1.1, 2, 0);
+                net.setInput(Dnn.blobFromImage(frame, 1.0d, new Size(300, 300), new Scalar(104.0, 177.0, 123.0, 0),
+                    false, false));
+                final Mat output = net.forward();
 
                 final Instant after = Instant.now();
                 accumulator = accumulator.plus(Duration.between(now, after));
@@ -121,17 +118,21 @@ public class CascadeFaceDetector {
                     ticks = 0;
                 }
 
-                int i = 0;
-                for (Rect rect : faces.toList()) {
-                    final Face face = new Face();
-                    face.name = "faceX " + i;
-                    face.meta = "Cascade";
-                    face.x = rect.x / SCALE;
-                    face.y = rect.y / SCALE;
-                    face.height = rect.height / SCALE;
-                    face.width = rect.width / SCALE;
-                    eventFaces.fireAsync(face);
-                    i++;
+                int j = 0;
+                final Mat detection = output.reshape(1, (int)output.total() / 7);
+                for (int i = 0; i < detection.rows(); ++i) {
+                    final double confidence = detection.get(i, 2)[0];
+                    if (confidence > CONFIDENCE_THRESHOLD) {
+                        final Face face = new Face();
+                        face.name = "faceY-" + j;
+                        face.x = detection.get(i, 3)[0] * frame.width();
+                        face.y = detection.get(i, 4)[0] * frame.height();
+                        face.width = detection.get(i, 5)[0] * frame.width() - face.x;
+                        face.height = detection.get(i, 6)[0] * frame.height() - face.y;
+                        face.meta = String.format(Locale.US, "conf: %f", confidence);
+                        eventFaces.fireAsync(face);
+                        j++;
+                    }
                 }
             }
         }

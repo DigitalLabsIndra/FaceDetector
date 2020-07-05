@@ -14,11 +14,8 @@ import javax.inject.Inject;
 import javax.inject.Singleton;
 
 import org.opencv.core.Mat;
-import org.opencv.core.MatOfRect;
-import org.opencv.core.Rect;
-import org.opencv.core.Size;
-import org.opencv.imgproc.Imgproc;
-import org.opencv.objdetect.CascadeClassifier;
+import org.opencv.core.Rect2d;
+import org.opencv.tracking.TrackerMedianFlow;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -35,24 +32,24 @@ import es.indra.dlabs.dsesteban.detector.opencv.OpenCVDetector.DetectorActions;
  * @since 0.1
  */
 @Singleton
-public class CascadeFaceDetector {
+public class CascadeFaceMedianTracker {
 
     /** Logger. */
-    private static final Logger LOG = LoggerFactory.getLogger(CascadeFaceDetector.class);
+    private static final Logger LOG = LoggerFactory.getLogger(CascadeFaceMedianTracker.class);
 
-    private static final String FACE_HAARCASCADE = "data/haarcascades/haarcascade_frontalface_alt.xml";
-    private static final String ID = "Cascade Detector";
+    private static final String ID = "Cascade Median Tracker";
     private static final int TICKS_COUNT = 40;
 
-    private static final Duration LAPSUS = Duration.ofMillis(500);
-    private static final double SCALE = 0.25;
+    private static final Duration LAPSUS = Duration.ofMillis(100);
 
-    private CascadeClassifier faceCascade;
     private Instant lastProcessed = Instant.MIN;
     private Duration accumulator = Duration.ZERO;
     private int ticks;
     private boolean initialized;
     private boolean active;
+    private TrackerMedianFlow tracker;
+    private Rect2d roi;
+    private boolean tracking;
 
     @Inject
     @DetectorEvent
@@ -64,7 +61,7 @@ public class CascadeFaceDetector {
     void initialize(@Observes @DetectorEvent final DetectorActions action) {
         switch (action) {
             case START:
-                faceCascade = new CascadeClassifier(FACE_HAARCASCADE);
+                tracker = TrackerMedianFlow.create();
                 LOG.info("{} has been initialized", ID);
                 evtInfo.fire(new DetectorInfo(ID));
                 initialized = true;
@@ -86,6 +83,8 @@ public class CascadeFaceDetector {
                     break;
                 case STOP:
                     active = false;
+                    roi = null;
+                    tracking = false;
                     LOG.info("{} has been deactivated", ID);
                     break;
                 default:
@@ -95,22 +94,33 @@ public class CascadeFaceDetector {
 
     /**
      * TODO: document.
+     * @param face
+     *        TODO: document
+     */
+    public void receivedROI(@ObservesAsync @DetectorEvent final Face face) {
+        if ((roi == null) && ("faceX 0".equals(face.name))) {
+            roi = new Rect2d(face.x, face.y, face.width, face.height);
+        }
+    }
+
+    /**
+     * TODO: document.
      * @param frame
      *        TODO: document
      */
     public void processImage(@ObservesAsync @GrabberEvent final Mat frame) {
-        if (initialized && active) {
+        if (initialized && active && (roi != null)) {
+            if (!tracking) {
+                tracking = true;
+                tracker.init(frame, roi);
+            }
             final Instant now = Instant.now();
             if (Duration.between(lastProcessed, now).compareTo(LAPSUS) > 0) {
                 lastProcessed = now;
 
-                final Mat matRed = new Mat();
-                Imgproc.resize(frame, matRed, new Size(), SCALE, SCALE, Imgproc.INTER_AREA);
-                final Mat grayFrame = new Mat();
-                Imgproc.cvtColor(matRed, grayFrame, Imgproc.COLOR_BGR2GRAY);
-                Imgproc.equalizeHist(grayFrame, grayFrame);
-                final MatOfRect faces = new MatOfRect();
-                faceCascade.detectMultiScale(grayFrame, faces, 1.1, 2, 0);
+                @SuppressWarnings("PMD.LocalVariableCouldBeFinal")
+                Rect2d rect = new Rect2d();
+                final boolean found = tracker.update(frame, rect);
 
                 final Instant after = Instant.now();
                 accumulator = accumulator.plus(Duration.between(now, after));
@@ -121,17 +131,16 @@ public class CascadeFaceDetector {
                     ticks = 0;
                 }
 
-                int i = 0;
-                for (Rect rect : faces.toList()) {
+                // TODO: un tracker por cara de un detector
+                if (found) {
                     final Face face = new Face();
-                    face.name = "faceX " + i;
-                    face.meta = "Cascade";
-                    face.x = rect.x / SCALE;
-                    face.y = rect.y / SCALE;
-                    face.height = rect.height / SCALE;
-                    face.width = rect.width / SCALE;
+                    face.name = "faceW 0";
+                    face.meta = "Tracking Median Cascade";
+                    face.x = rect.x;
+                    face.y = rect.y;
+                    face.height = rect.height;
+                    face.width = rect.width;
                     eventFaces.fireAsync(face);
-                    i++;
                 }
             }
         }

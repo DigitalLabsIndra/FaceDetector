@@ -6,7 +6,6 @@ package es.indra.dlabs.dsesteban.detector.opencv;
 
 import java.time.Duration;
 import java.time.Instant;
-import java.util.Locale;
 
 import javax.enterprise.event.Event;
 import javax.enterprise.event.Observes;
@@ -15,18 +14,16 @@ import javax.inject.Inject;
 import javax.inject.Singleton;
 
 import org.opencv.core.Mat;
-import org.opencv.core.Scalar;
-import org.opencv.core.Size;
-import org.opencv.dnn.Dnn;
-import org.opencv.dnn.Net;
+import org.opencv.core.Rect2d;
+import org.opencv.tracking.TrackerTLD;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import es.indra.dlabs.dsesteban.detector.Face;
 import es.indra.dlabs.dsesteban.detector.cdi.DetectorAction;
 import es.indra.dlabs.dsesteban.detector.cdi.DetectorEvent;
 import es.indra.dlabs.dsesteban.detector.cdi.DetectorInfo;
-import es.indra.dlabs.dsesteban.detector.cdi.GrabberEvent;
+import es.indra.dlabs.dsesteban.detector.face.Face;
+import es.indra.dlabs.dsesteban.detector.grabber.GrabberEvent;
 import es.indra.dlabs.dsesteban.detector.opencv.OpenCVDetector.DetectorActions;
 
 /**
@@ -35,25 +32,24 @@ import es.indra.dlabs.dsesteban.detector.opencv.OpenCVDetector.DetectorActions;
  * @since 0.1
  */
 @Singleton
-public class DnnFaceDetector {
+public class CascadeFaceTLDTracker {
 
     /** Logger. */
-    private static final Logger LOG = LoggerFactory.getLogger(DnnFaceDetector.class);
+    private static final Logger LOG = LoggerFactory.getLogger(CascadeFaceTLDTracker.class);
 
-    private static final String FACE_PROTO = "data/dnn/deploy.prototxt";
-    private static final String FACE_CAFFE = "data/dnn/res10_300x300_ssd_iter_140000.caffemodel";
-    private static final String ID = "Dnn Caffe Detector";
-    private static final double CONFIDENCE_THRESHOLD = 0.6;
-    private static final int TICKS_COUNT = 20;
+    private static final String ID = "Cascade TLD Tracker";
+    private static final int TICKS_COUNT = 40;
 
-    private static final Duration LAPSUS = Duration.ofMillis(200);
+    private static final Duration LAPSUS = Duration.ofMillis(100);
 
-    private Net net;
     private Instant lastProcessed = Instant.MIN;
     private Duration accumulator = Duration.ZERO;
     private int ticks;
     private boolean initialized;
     private boolean active;
+    private TrackerTLD tracker;
+    private Rect2d roi;
+    private boolean tracking;
 
     @Inject
     @DetectorEvent
@@ -65,7 +61,7 @@ public class DnnFaceDetector {
     void initialize(@Observes @DetectorEvent final DetectorActions action) {
         switch (action) {
             case START:
-                net = Dnn.readNetFromCaffe(FACE_PROTO, FACE_CAFFE);
+                tracker = TrackerTLD.create();
                 LOG.info("{} has been initialized", ID);
                 evtInfo.fire(new DetectorInfo(ID));
                 initialized = true;
@@ -87,6 +83,8 @@ public class DnnFaceDetector {
                     break;
                 case STOP:
                     active = false;
+                    roi = null;
+                    tracking = false;
                     LOG.info("{} has been deactivated", ID);
                     break;
                 default:
@@ -96,18 +94,33 @@ public class DnnFaceDetector {
 
     /**
      * TODO: document.
+     * @param face
+     *        TODO: document
+     */
+    public void receivedROI(@ObservesAsync @DetectorEvent final Face face) {
+        if ((roi == null) && ("faceX 0".equals(face.name))) {
+            roi = new Rect2d(face.x, face.y, face.width, face.height);
+        }
+    }
+
+    /**
+     * TODO: document.
      * @param frame
      *        TODO: document
      */
     public void processImage(@ObservesAsync @GrabberEvent final Mat frame) {
-        if (initialized && active) {
+        if (initialized && active && (roi != null)) {
+            if (!tracking) {
+                tracking = true;
+                tracker.init(frame, roi);
+            }
             final Instant now = Instant.now();
             if (Duration.between(lastProcessed, now).compareTo(LAPSUS) > 0) {
                 lastProcessed = now;
 
-                net.setInput(Dnn.blobFromImage(frame, 1.0d, new Size(300, 300), new Scalar(104.0, 177.0, 123.0, 0),
-                    false, false));
-                final Mat output = net.forward();
+                @SuppressWarnings("PMD.LocalVariableCouldBeFinal")
+                Rect2d rect = new Rect2d();
+                final boolean found = tracker.update(frame, rect);
 
                 final Instant after = Instant.now();
                 accumulator = accumulator.plus(Duration.between(now, after));
@@ -118,19 +131,16 @@ public class DnnFaceDetector {
                     ticks = 0;
                 }
 
-                final Mat detection = output.reshape(1, (int)output.total() / 7);
-                for (int i = 0; i < detection.rows(); ++i) {
-                    final double confidence = detection.get(i, 2)[0];
-                    if (confidence > CONFIDENCE_THRESHOLD) {
-                        final Face face = new Face();
-                        face.name = "faceY";
-                        face.x = detection.get(i, 3)[0] * frame.width();
-                        face.y = detection.get(i, 4)[0] * frame.height();
-                        face.width = detection.get(i, 5)[0] * frame.width() - face.x;
-                        face.height = detection.get(i, 6)[0] * frame.height() - face.y;
-                        face.meta = String.format(Locale.US, "conf: %f", confidence);
-                        eventFaces.fireAsync(face);
-                    }
+                // TODO: un tracker por cara de un detector
+                if (found) {
+                    final Face face = new Face();
+                    face.name = "faceV 0";
+                    face.meta = "Tracking TLD Cascade";
+                    face.x = rect.x;
+                    face.y = rect.y;
+                    face.height = rect.height;
+                    face.width = rect.width;
+                    eventFaces.fireAsync(face);
                 }
             }
         }

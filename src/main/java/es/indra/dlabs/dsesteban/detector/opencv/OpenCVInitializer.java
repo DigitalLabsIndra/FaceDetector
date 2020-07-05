@@ -9,8 +9,6 @@ import javax.enterprise.event.ObservesAsync;
 import javax.inject.Inject;
 import javax.inject.Singleton;
 
-import org.bytedeco.javacpp.Loader;
-import org.bytedeco.opencv.opencv_java;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -24,10 +22,10 @@ import es.indra.dlabs.dsesteban.detector.opencv.OpenCVDetector.DetectorActions;
  * @since 0.1
  */
 @Singleton
-public class OpenCVDetectors implements Detector {
+public class OpenCVInitializer implements Detector {
 
     /** Logger. */
-    private static final Logger LOG = LoggerFactory.getLogger(OpenCVDetectors.class);
+    private static final Logger LOG = LoggerFactory.getLogger(OpenCVInitializer.class);
 
     private boolean platformInit;
 
@@ -42,7 +40,9 @@ public class OpenCVDetectors implements Detector {
     @DetectorEvent
     Event<OpenCVDetector.DetectorActions> evtDetector;
 
-    @SuppressWarnings("PMD.AvoidCatchingThrowable")
+    @SuppressWarnings({
+        "PMD.AvoidCatchingThrowable", "PMD.AvoidUsingNativeCode"
+    })
     void start(@ObservesAsync @DetectorEvent final PlatformActions event) {
         LOG.trace("Evento de plataforma recibido en detectores OpenCV: {}", event);
         switch (event) {
@@ -51,7 +51,8 @@ public class OpenCVDetectors implements Detector {
                     LOG.debug("Inicializando plataforma OpenCV");
                     evtPlatform.fire(PlatformStatus.INITIALIZING);
                     try {
-                        Loader.load(opencv_java.class);
+                        System.loadLibrary("opencv_java");
+                        // Loader.load(opencv_java.class);
                         evtDetector.fire(DetectorActions.START);
                         platformInit = true;
                         LOG.debug("Plataforma OpenCV inicializada");

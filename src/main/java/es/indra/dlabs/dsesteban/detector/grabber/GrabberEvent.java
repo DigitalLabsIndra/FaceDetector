@@ -2,7 +2,7 @@
  * Copyright (C) 2020 INDRA FACTORÍA TECNOLÓGICA S.L.U.
  * All rights reserved
  **/
-package es.indra.dlabs.dsesteban.detector.cdi;
+package es.indra.dlabs.dsesteban.detector.grabber;
 
 import java.lang.annotation.Documented;
 import java.lang.annotation.ElementType;
