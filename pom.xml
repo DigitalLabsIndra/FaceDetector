@@ -48,6 +48,8 @@
         <version.javafx>14.0.1</version.javafx>
         <version.commons-io>2.7</version.commons-io>
         <version.javacv>1.5.3</version.javacv>
+        <version.ikonli>11.5.0</version.ikonli>
+        <version.micrometer>1.5.2</version.micrometer>
 
         <opencv.dir>${basedir}</opencv.dir>
     </properties>
@@ -84,6 +86,13 @@
                 <artifactId>log4j-slf4j-impl</artifactId>
                 <version>${version.log4j}</version>
                 <scope>runtime</scope>
+            </dependency>
+            <dependency>
+                <groupId>io.micrometer</groupId>
+                <artifactId>micrometer-bom</artifactId>
+                <version>${version.micrometer}</version>
+                <type>pom</type>
+                <scope>import</scope>
             </dependency>
         </dependencies>
     </dependencyManagement>
@@ -126,6 +135,20 @@
             <groupId>commons-io</groupId>
             <artifactId>commons-io</artifactId>
             <version>${version.commons-io}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.kordamp.ikonli</groupId>
+            <artifactId>ikonli-javafx</artifactId>
+            <version>${version.ikonli}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.kordamp.ikonli</groupId>
+            <artifactId>ikonli-materialdesign-pack</artifactId>
+            <version>${version.ikonli}</version>
+        </dependency>
+        <dependency>
+            <groupId>io.micrometer</groupId>
+            <artifactId>micrometer-core</artifactId>
         </dependency>
 
         <dependency>
@@ -426,17 +449,6 @@
                 <version.opencv>4.3.0</version.opencv>
             </properties>
             <dependencies>
-                <!-- <dependency>
-                    <groupId>org.bytedeco</groupId>
-                    <artifactId>javacv</artifactId>
-                    <version>${version.javacv}</version>
-                    <exclusions>
-                        <exclusion>
-                            <groupId>*</groupId>
-                            <artifactId>*</artifactId>
-                        </exclusion>
-                    </exclusions>
-                </dependency> -->
                 <dependency>
                     <groupId>org.bytedeco</groupId>
                     <artifactId>opencv</artifactId>

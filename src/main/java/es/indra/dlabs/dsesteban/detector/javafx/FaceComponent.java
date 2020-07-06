@@ -7,9 +7,11 @@ package es.indra.dlabs.dsesteban.detector.javafx;
 import java.io.IOException;
 import java.io.InputStream;
 
+import org.kordamp.ikonli.javafx.FontIcon;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javafx.animation.FadeTransition;
 import javafx.animation.KeyFrame;
 import javafx.animation.KeyValue;
 import javafx.animation.ParallelTransition;
@@ -35,7 +37,7 @@ public class FaceComponent extends StackPane {
     private static final Logger LOG = LoggerFactory.getLogger(FaceComponent.class);
 
     private static final String FACE_TEMPLATE = "/design/Face.fxml";
-    private static final Duration LATENCY_DURATION = Duration.millis(60);
+    private static final Duration LATENCY_DURATION = Duration.millis(40);
 
     @FXML
     Text nameLbl;
@@ -43,6 +45,13 @@ public class FaceComponent extends StackPane {
     Text metaLbl;
     @FXML
     Rectangle frameRct;
+    @FXML
+    FontIcon faceIcon;
+    @FXML
+    FontIcon biohazardIcon;
+
+    private boolean biohazard;
+
     private Rectangle2D overlaySize = Rectangle2D.EMPTY;
 
     /**
@@ -87,6 +96,45 @@ public class FaceComponent extends StackPane {
         }
     }
 
+    private void showBiohazard() {
+        animateBiohazard(0.0, 1.0);
+    }
+
+    private void hideBiohazard() {
+        animateBiohazard(1.0, 0.0);
+    }
+
+    private void animateBiohazard(final double from, final double to) {
+        final FadeTransition trans = new FadeTransition(LATENCY_DURATION, biohazardIcon);
+        trans.setFromValue(from);
+        trans.setToValue(to);
+        trans.play();
+    }
+
+    /**
+     * TODO: document.
+     * @param status
+     *        TODO: document
+     */
+    public void setBiohazard(final boolean status) {
+        if (status != biohazard) {
+            if (status) {
+                showBiohazard();
+            } else {
+                hideBiohazard();
+            }
+        }
+        biohazard = status;
+    }
+
+    /**
+     * TODO: document.
+     * @return TODO: document
+     */
+    public boolean isBiohazard() {
+        return biohazard;
+    }
+
     /**
      * TODO: document.
      * @param color
@@ -96,6 +144,8 @@ public class FaceComponent extends StackPane {
         nameLbl.setFill(color);
         metaLbl.setFill(color);
         frameRct.setStroke(color);
+        biohazardIcon.setIconColor(color);
+        faceIcon.setIconColor(color);
     }
 
     /**

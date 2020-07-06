@@ -22,6 +22,14 @@ public class Face {
     /**
      * TODO: document.
      */
+    public FaceProcessors processor;
+    /**
+     * TODO: document.
+     */
+    public long frameId;
+    /**
+     * TODO: document.
+     */
     public double x;
     /**
      * TODO: document.

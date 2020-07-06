@@ -4,6 +4,7 @@
  **/
 package es.indra.dlabs.dsesteban.detector.javafx;
 
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -30,6 +31,8 @@ import es.indra.dlabs.dsesteban.detector.cdi.DetectorAction.DetectorActions;
 import es.indra.dlabs.dsesteban.detector.cdi.DetectorEvent;
 import es.indra.dlabs.dsesteban.detector.cdi.DetectorInfo;
 import es.indra.dlabs.dsesteban.detector.face.Face;
+import es.indra.dlabs.dsesteban.detector.face.FaceAttribute;
+import es.indra.dlabs.dsesteban.detector.face.FaceAttributesEnum;
 import es.indra.dlabs.dsesteban.detector.grabber.GrabberEvent;
 import es.indra.dlabs.dsesteban.detector.grabber.VideoFrame;
 import es.indra.dlabs.dsesteban.detector.grabber.VideoGrabber;
@@ -66,9 +69,11 @@ public class CamMonitorController {
         Color.AQUAMARINE, Color.BURLYWOOD, Color.CHARTREUSE, Color.CORAL, Color.GAINSBORO
     };
     private static final long LASTING_FACE = 3000;
-    private static final Duration FADING_TIME = Duration.millis(1000);
+    private static final Duration FADING_TIME = Duration.millis(500);
+    private static final java.time.Duration MOUTH_TIME = java.time.Duration.ofSeconds(4);
 
     private class FaceBlock {
+        Instant timestamp;
         FaceComponent faceComp;
         ScheduledFuture<?> schedule;
     }
@@ -85,6 +90,10 @@ public class CamMonitorController {
     BorderPane operPane;
     @FXML
     VBox detectorsPane;
+    @FXML
+    VBox trackersPane;
+    @FXML
+    VBox othersPane;
 
     @Inject
     VideoGrabber grabber;
@@ -125,7 +134,13 @@ public class CamMonitorController {
                         evtDetectorAction.fireAsync(new DetectorAction(info.id, DetectorActions.STOP));
                     }
                 });
-                detectorsPane.getChildren().add(check);
+                if (info.id.startsWith("Detector -")) {
+                    detectorsPane.getChildren().add(check);
+                } else if (info.id.startsWith("Tracker -")) {
+                    trackersPane.getChildren().add(check);
+                } else {
+                    othersPane.getChildren().add(check);
+                }
             });
         }
     }
@@ -247,6 +262,30 @@ public class CamMonitorController {
                 trans.setOnFinished((e) -> overlayPane.getChildren().remove(removed.faceComp));
                 trans.play();
             });
+        }
+    }
+
+    /**
+     * TODO: document.
+     * @param attr
+     *        TODO: document
+     */
+    public void showAttributes(@ObservesAsync @DetectorEvent final FaceAttribute attr) {
+        final FaceBlock face = faces.get(attr.name);
+        if (face != null) {
+            if (FaceAttributesEnum.MOUTH.equals(attr.attribute)) {
+                face.timestamp = null;
+                if (!face.faceComp.isBiohazard()) {
+                    face.faceComp.setBiohazard(true);
+                }
+            } else if (FaceAttributesEnum.NO_MOUTH.equals(attr.attribute) && face.faceComp.isBiohazard()) {
+                if (face.timestamp == null) {
+                    face.timestamp = Instant.now();
+                } else if (java.time.Duration.between(face.timestamp, Instant.now()).compareTo(MOUTH_TIME) > 0) {
+                    face.faceComp.setBiohazard(false);
+                    face.timestamp = null;
+                }
+            }
         }
     }
 

@@ -7,6 +7,7 @@ package es.indra.dlabs.dsesteban.detector.opencv;
 import java.time.Duration;
 import java.time.Instant;
 
+import javax.annotation.PostConstruct;
 import javax.enterprise.event.Event;
 import javax.enterprise.event.Observes;
 import javax.enterprise.event.ObservesAsync;
@@ -26,8 +27,11 @@ import es.indra.dlabs.dsesteban.detector.cdi.DetectorAction;
 import es.indra.dlabs.dsesteban.detector.cdi.DetectorEvent;
 import es.indra.dlabs.dsesteban.detector.cdi.DetectorInfo;
 import es.indra.dlabs.dsesteban.detector.face.Face;
+import es.indra.dlabs.dsesteban.detector.face.FaceProcessors;
 import es.indra.dlabs.dsesteban.detector.grabber.GrabberEvent;
 import es.indra.dlabs.dsesteban.detector.opencv.OpenCVDetector.DetectorActions;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Timer;
 
 /**
  * TODO: document.
@@ -41,25 +45,33 @@ public class CascadeFaceDetector {
     private static final Logger LOG = LoggerFactory.getLogger(CascadeFaceDetector.class);
 
     private static final String FACE_HAARCASCADE = "data/haarcascades/haarcascade_frontalface_alt.xml";
-    private static final String ID = "Cascade Detector";
-    private static final int TICKS_COUNT = 40;
+    private static final String ID = "Detector - Cascade";
 
     private static final Duration LAPSUS = Duration.ofMillis(500);
     private static final double SCALE = 0.25;
 
     private CascadeClassifier faceCascade;
     private Instant lastProcessed = Instant.MIN;
-    private Duration accumulator = Duration.ZERO;
-    private int ticks;
     private boolean initialized;
     private boolean active;
+    private Timer timer;
 
     @Inject
     @DetectorEvent
     Event<Face> eventFaces;
     @Inject
     @DetectorEvent
+    Event<OpenCVFace> cvEventFaces;
+    @Inject
+    @DetectorEvent
     Event<DetectorInfo> evtInfo;
+    @Inject
+    MeterRegistry registry;
+
+    @PostConstruct
+    void init() {
+        timer = registry.timer("detector.face.cascade");
+    }
 
     void initialize(@Observes @DetectorEvent final DetectorActions action) {
         switch (action) {
@@ -98,39 +110,42 @@ public class CascadeFaceDetector {
      * @param frame
      *        TODO: document
      */
-    public void processImage(@ObservesAsync @GrabberEvent final Mat frame) {
+    public void processImage(@ObservesAsync @GrabberEvent final OpenCVVideoFrame frame) {
         if (initialized && active) {
             final Instant now = Instant.now();
             if (Duration.between(lastProcessed, now).compareTo(LAPSUS) > 0) {
                 lastProcessed = now;
 
                 final Mat matRed = new Mat();
-                Imgproc.resize(frame, matRed, new Size(), SCALE, SCALE, Imgproc.INTER_AREA);
+                Imgproc.resize(frame.image, matRed, new Size(), SCALE, SCALE, Imgproc.INTER_AREA);
                 final Mat grayFrame = new Mat();
                 Imgproc.cvtColor(matRed, grayFrame, Imgproc.COLOR_BGR2GRAY);
                 Imgproc.equalizeHist(grayFrame, grayFrame);
                 final MatOfRect faces = new MatOfRect();
                 faceCascade.detectMultiScale(grayFrame, faces, 1.1, 2, 0);
 
-                final Instant after = Instant.now();
-                accumulator = accumulator.plus(Duration.between(now, after));
-                ticks++;
-                if (ticks > TICKS_COUNT) {
-                    LOG.trace("Media procesamiento: {}", accumulator.toMillis() / ticks);
-                    accumulator = Duration.ZERO;
-                    ticks = 0;
-                }
+                timer.record(Duration.between(now, Instant.now()));
 
                 int i = 0;
                 for (Rect rect : faces.toList()) {
+                    // TODO: bloqueada multicaras porque ahora da problemas
+                    if (i > 0) {
+                        break;
+                    }
                     final Face face = new Face();
-                    face.name = "faceX " + i;
+                    face.name = "face " + i + " X";
                     face.meta = "Cascade";
                     face.x = rect.x / SCALE;
                     face.y = rect.y / SCALE;
                     face.height = rect.height / SCALE;
                     face.width = rect.width / SCALE;
+                    face.frameId = frame.id;
+                    face.processor = FaceProcessors.DETECTOR;
                     eventFaces.fireAsync(face);
+                    final OpenCVFace cvFace = new OpenCVFace();
+                    cvFace.face = face;
+                    cvFace.frame = frame;
+                    cvEventFaces.fireAsync(cvFace);
                     i++;
                 }
             }

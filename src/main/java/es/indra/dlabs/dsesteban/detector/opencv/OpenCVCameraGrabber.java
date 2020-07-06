@@ -45,7 +45,7 @@ public class OpenCVCameraGrabber implements VideoGrabber {
     Event<VideoFrame> eventPlayers;
     @Inject
     @GrabberEvent
-    Event<Mat> eventProcessors;
+    Event<OpenCVVideoFrame> eventProcessors;
     @Inject
     @GrabberEvent
     Event<GrabberStatus> statusNotifier;
@@ -88,8 +88,9 @@ public class OpenCVCameraGrabber implements VideoGrabber {
                     final Mat frame = new Mat();
                     if (!isCanceled() && capture.read(frame)) {
                         if (!isCanceled()) {
-                            notifyPlayers(id++, OpenCVUtils.matToBufferedImage(frame));
-                            notifyProcessors(frame);
+                            notifyPlayers(id, OpenCVUtils.matToBufferedImage(frame));
+                            notifyProcessors(id, frame);
+                            id++;
                         }
                     } else {
                         LOG.trace("Grabber cancelado o no puede hacer read");
@@ -167,9 +168,12 @@ public class OpenCVCameraGrabber implements VideoGrabber {
         }
     }
 
-    private void notifyProcessors(final Mat image) {
+    private void notifyProcessors(final long id, final Mat image) {
         if (image != null) {
-            eventProcessors.fireAsync(image);
+            final OpenCVVideoFrame videoFrame = new OpenCVVideoFrame();
+            videoFrame.id = id;
+            videoFrame.image = image;
+            eventProcessors.fireAsync(videoFrame);
         }
     }
 

@@ -10,6 +10,8 @@ import javax.enterprise.util.AnnotationLiteral;
 
 import org.jboss.weld.environment.se.Weld;
 
+import io.micrometer.core.instrument.Metrics;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import javafx.application.Application;
 import javafx.stage.Stage;
 
@@ -37,6 +39,7 @@ public class Launcher extends Application {
      *        TODO: document
      */
     public static void main(final String[] args) {
+        Metrics.addRegistry(new SimpleMeterRegistry());
         launch(args);
     }
 

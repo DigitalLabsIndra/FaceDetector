@@ -7,15 +7,15 @@ package es.indra.dlabs.dsesteban.detector.opencv;
 import java.time.Duration;
 import java.time.Instant;
 
+import javax.annotation.PostConstruct;
 import javax.enterprise.event.Event;
 import javax.enterprise.event.Observes;
 import javax.enterprise.event.ObservesAsync;
 import javax.inject.Inject;
 import javax.inject.Singleton;
 
-import org.opencv.core.Mat;
 import org.opencv.core.Rect2d;
-import org.opencv.tracking.TrackerMedianFlow;
+import org.opencv.tracking.TrackerTLD;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -23,8 +23,11 @@ import es.indra.dlabs.dsesteban.detector.cdi.DetectorAction;
 import es.indra.dlabs.dsesteban.detector.cdi.DetectorEvent;
 import es.indra.dlabs.dsesteban.detector.cdi.DetectorInfo;
 import es.indra.dlabs.dsesteban.detector.face.Face;
+import es.indra.dlabs.dsesteban.detector.face.FaceProcessors;
 import es.indra.dlabs.dsesteban.detector.grabber.GrabberEvent;
 import es.indra.dlabs.dsesteban.detector.opencv.OpenCVDetector.DetectorActions;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Timer;
 
 /**
  * TODO: document.
@@ -32,36 +35,43 @@ import es.indra.dlabs.dsesteban.detector.opencv.OpenCVDetector.DetectorActions;
  * @since 0.1
  */
 @Singleton
-public class CascadeFaceMedianTracker {
+public class FaceTLDTracker {
 
     /** Logger. */
-    private static final Logger LOG = LoggerFactory.getLogger(CascadeFaceMedianTracker.class);
+    private static final Logger LOG = LoggerFactory.getLogger(FaceTLDTracker.class);
 
-    private static final String ID = "Cascade Median Tracker";
-    private static final int TICKS_COUNT = 40;
+    private static final String ID = "Tracker - TLD";
 
     private static final Duration LAPSUS = Duration.ofMillis(100);
 
     private Instant lastProcessed = Instant.MIN;
-    private Duration accumulator = Duration.ZERO;
-    private int ticks;
     private boolean initialized;
     private boolean active;
-    private TrackerMedianFlow tracker;
-    private Rect2d roi;
+    private TrackerTLD tracker;
     private boolean tracking;
+    private Timer timer;
 
     @Inject
     @DetectorEvent
     Event<Face> eventFaces;
     @Inject
     @DetectorEvent
+    Event<OpenCVFace> cvEventFaces;
+    @Inject
+    @DetectorEvent
     Event<DetectorInfo> evtInfo;
+    @Inject
+    MeterRegistry registry;
+
+    @PostConstruct
+    void init() {
+        timer = registry.timer("tracker.tld");
+    }
 
     void initialize(@Observes @DetectorEvent final DetectorActions action) {
         switch (action) {
             case START:
-                tracker = TrackerMedianFlow.create();
+                tracker = TrackerTLD.create();
                 LOG.info("{} has been initialized", ID);
                 evtInfo.fire(new DetectorInfo(ID));
                 initialized = true;
@@ -83,7 +93,6 @@ public class CascadeFaceMedianTracker {
                     break;
                 case STOP:
                     active = false;
-                    roi = null;
                     tracking = false;
                     LOG.info("{} has been deactivated", ID);
                     break;
@@ -94,12 +103,17 @@ public class CascadeFaceMedianTracker {
 
     /**
      * TODO: document.
-     * @param face
+     * @param evtFace
      *        TODO: document
      */
-    public void receivedROI(@ObservesAsync @DetectorEvent final Face face) {
-        if ((roi == null) && ("faceX 0".equals(face.name))) {
-            roi = new Rect2d(face.x, face.y, face.width, face.height);
+    public void receivedROI(@ObservesAsync @DetectorEvent final OpenCVFace evtFace) {
+        if (initialized && active && !tracking) {
+            if (FaceProcessors.DETECTOR.equals(evtFace.face.processor) && (evtFace.face.name.startsWith("face 0"))) {
+                LOG.debug("Tracker recibe su primer ROI con el que trabajar");
+                tracker.init(evtFace.frame.image, new Rect2d(evtFace.face.x, evtFace.face.y, evtFace.face.width,
+                    evtFace.face.height));
+                tracking = true;
+            }
         }
     }
 
@@ -108,39 +122,34 @@ public class CascadeFaceMedianTracker {
      * @param frame
      *        TODO: document
      */
-    public void processImage(@ObservesAsync @GrabberEvent final Mat frame) {
-        if (initialized && active && (roi != null)) {
-            if (!tracking) {
-                tracking = true;
-                tracker.init(frame, roi);
-            }
+    public void processImage(@ObservesAsync @GrabberEvent final OpenCVVideoFrame frame) {
+        if (initialized && active && tracking) {
             final Instant now = Instant.now();
             if (Duration.between(lastProcessed, now).compareTo(LAPSUS) > 0) {
                 lastProcessed = now;
 
                 @SuppressWarnings("PMD.LocalVariableCouldBeFinal")
                 Rect2d rect = new Rect2d();
-                final boolean found = tracker.update(frame, rect);
+                final boolean found = tracker.update(frame.image, rect);
 
-                final Instant after = Instant.now();
-                accumulator = accumulator.plus(Duration.between(now, after));
-                ticks++;
-                if (ticks > TICKS_COUNT) {
-                    LOG.trace("Media procesamiento: {}", accumulator.toMillis() / ticks);
-                    accumulator = Duration.ZERO;
-                    ticks = 0;
-                }
+                timer.record(Duration.between(now, Instant.now()));
 
                 // TODO: un tracker por cara de un detector
                 if (found) {
                     final Face face = new Face();
-                    face.name = "faceW 0";
-                    face.meta = "Tracking Median Cascade";
+                    face.name = "face 0V";
+                    face.meta = "Tracking TLD Cascade";
                     face.x = rect.x;
                     face.y = rect.y;
                     face.height = rect.height;
                     face.width = rect.width;
+                    face.frameId = frame.id;
+                    face.processor = FaceProcessors.TRACKING;
                     eventFaces.fireAsync(face);
+                    final OpenCVFace cvFace = new OpenCVFace();
+                    cvFace.face = face;
+                    cvFace.frame = frame;
+                    cvEventFaces.fireAsync(cvFace);
                 }
             }
         }
